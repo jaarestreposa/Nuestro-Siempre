@@ -469,7 +469,7 @@ ul.playlist li.active .pl-dur{display:none;}
 <audio id="audio" preload="none"></audio>
 <script>
 const TRACKS=[
-  {title:'Intro — Nuestro Siempre',      num:'TRACK 1 · 6 CANCIONES',src:'1__Intro.mp3',                     art:'art-0', type:'audio/mp3'},
+  {title:'Intro — Nuestro Siempre',      num:'TRACK 1 · 6 CANCIONES',src:'1__Intro.mp3', art:'art-0'},
   {title:'El Día que Nació Mi Bendición',num:'TRACK 2 · 6 CANCIONES',src:'2. El dia que nacio mi bendicion.mp3',art:'art-1'},
   {title:'Nuestra Historia',             num:'TRACK 3 · 6 CANCIONES',src:'3. Nuestra historia.mp3',            art:'art-2'},
   {title:'Nuestro Siempre',              num:'TRACK 4 · 6 CANCIONES',src:'4. Nuestro Siempre.mp3',             art:'art-3'},
@@ -507,15 +507,55 @@ function loadTrack(i,play){
   $('tTitle').textContent=t.title;$('tNum').textContent=t.num;
   $('progFill').style.width='0%';$('tCur').textContent='0:00';$('tTot').textContent='—';
   showArt(t.art);setActive(i);
-  audio.src=t.src;
-  if(t.type){audio.type=t.type;}
+  // Limpiar source anterior completamente
+  audio.pause();
+  audio.removeAttribute('src');
   audio.load();
-  if(play)audio.play().then(()=>{playing=true;$('btnPlay').innerHTML='&#9646;&#9646;';}).catch(()=>{});
+  // Pequeño delay para que el browser limpie el buffer
+  setTimeout(()=>{
+    audio.src = t.src;
+    audio.load();
+    if(play){
+      audio.play().then(()=>{
+        playing=true;
+        $('btnPlay').innerHTML='&#9646;&#9646;';
+      }).catch(e=>{
+        console.warn('Play error:',e);
+        // Intentar de nuevo después de interacción
+        playing=false;
+        $('btnPlay').innerHTML='&#9654;';
+      });
+    }
+  }, 50);
 }
 function toggle(){
-  if(cur<0){loadTrack(0,true);return;}
+  if(cur<0){
+    // Primera vez: cargar track 0 manualmente
+    cur=0;
+    const t=TRACKS[0];
+    $('tTitle').textContent=t.title;
+    $('tNum').textContent=t.num;
+    $('progFill').style.width='0%';
+    $('tCur').textContent='0:00';
+    $('tTot').textContent='—';
+    showArt(t.art);setActive(0);
+    audio.pause();
+    audio.removeAttribute('src');
+    const url = encodeURIComponent(t.src).replace(/%20/g,'%20');
+    audio.src = t.src;
+    audio.load();
+    audio.play().then(()=>{
+      playing=true;
+      $('btnPlay').innerHTML='&#9646;&#9646;';
+    }).catch(e=>{
+      console.error('Error intro:',e.message, e.name);
+      // Mostrar error en pantalla para debug
+      $('tNum').textContent='Error: '+e.name;
+    });
+    return;
+  }
   if(playing){audio.pause();playing=false;$('btnPlay').innerHTML='&#9654;';}
-  else{audio.play().then(()=>{playing=true;$('btnPlay').innerHTML='&#9646;&#9646;';}).catch(()=>{});}
+  else{audio.play().then(()=>{playing=true;$('btnPlay').innerHTML='&#9646;&#9646;';}).catch(e=>{console.error(e);});}
 }
 $('btnPlay').onclick=toggle;
 $('btnPrev').onclick=()=>{if(audio.currentTime>3){audio.currentTime=0;return;}loadTrack(cur<=0?TRACKS.length-1:cur-1,true);};
